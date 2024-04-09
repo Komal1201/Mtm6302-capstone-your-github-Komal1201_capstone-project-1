@@ -1,86 +1,73 @@
-function parseUrl(url) {
-    return url.substring(url.substring(0, url.length - 2).lastIndexOf('/') + 1, url.length - 1);
-}
+document.addEventListener("DOMContentLoaded", () => {
+  const pokemonList = document.getElementById("pokemon-list");
+  const caughtPokemonList = document.getElementById("caught-pokemon");
+  const detailsSection = document.getElementById("pokemon-details");
 
-function isCaught(pokemonId) {
-    const caughtPokemon = JSON.parse(localStorage.getItem('caughtPokemon') || '[]');
-    return caughtPokemon.includes(pokemonId);
-}
-
-function toggleCaught(pokemonId) {
-    const caughtPokemon = JSON.parse(localStorage.getItem('caughtPokemon') || '[]');
-    if (caughtPokemon.includes(pokemonId)) {
-        const index = caughtPokemon.indexOf(pokemonId);
-        caughtPokemon.splice(index, 1);
-    } else {
-        caughtPokemon.push(pokemonId);
-    }
-    localStorage.setItem('caughtPokemon', JSON.stringify(caughtPokemon));
-    updatePokemonList();
-}
-
-async function fetchPokemon(offset = 0, limit = 20) {
-    const response = await fetch(`https://pokeapi.co/api/v2/pokemon?offset=${offset}&limit=${limit}`);
+  async function fetchPokemon() {
+    const response = await fetch("https://pokeapi.co/api/v2/pokemon?limit=20");
     const data = await response.json();
     displayPokemon(data.results);
-}
+  }
 
-function displayPokemon(pokemonList) {
-    const pokemonContainer = document.getElementById('pokemon-list');
-    pokemonContainer.innerHTML = ''; 
-    pokemonList.forEach(pokemon => {
-        const pokemonElement = document.createElement('div');
-        pokemonElement.classList.add('pokemon');
-        const pokemonId = parseUrl(pokemon.url);
-        pokemonElement.innerHTML = `
-            <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonId}.png" alt="${pokemon.name}">
-            <p>${pokemon.name}</p>
-            <button class="catch-btn" data-pokemon-id="${pokemonId}">${isCaught(pokemonId) ? 'Release' : 'Catch'}</button>
-        `;
-        pokemonElement.addEventListener('click', () => showPokemonDetail(pokemonId));
-        pokemonContainer.appendChild(pokemonElement);
+  function displayPokemon(pokemon) {
+    pokemon.forEach((p) => {
+      const pokemonItem = document.createElement("div");
+      pokemonItem.classList.add("pokemon-item");
+      const pokemonImage = document.createElement("img");
+      const pokemonId = p.url.split("/").filter(Boolean).pop(); // Extracts ID from URL
+      pokemonImage.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonId}.png`;
+      const pokemonName = document.createElement("span");
+      pokemonName.textContent = p.name;
+      pokemonItem.appendChild(pokemonImage);
+      pokemonItem.appendChild(pokemonName);
+      pokemonItem.addEventListener("click", () => {
+        fetchPokemonDetails(p.url);
+      });
+      pokemonList.appendChild(pokemonItem);
     });
+  }
 
-    document.querySelectorAll('.catch-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation(); 
-            const pokemonId = button.getAttribute('data-pokemon-id');
-            toggleCaught(pokemonId);
-        });
-    });
-}
+  async function fetchPokemonDetails(url) {
+    const response = await fetch(url);
+    const data = await response.json();
+    displayPokemonDetails(data);
+  }
 
-async function showPokemonDetail(pokemonId) {
-    const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonId}/`);
-    const pokemon = await response.json();
-    const detailContainer = document.getElementById('pokemon-detail');
-    detailContainer.innerHTML = `
-        <img src="${pokemon.sprites.other['official-artwork'].front_default}" alt="${pokemon.name}">
-        <h2>${pokemon.name}</h2>
-        <p>Height: ${pokemon.height}</p>
-        <p>Weight: ${pokemon.weight}</p>
-        <ul>
-            ${pokemon.abilities.map(ability => `<li>${ability.ability.name}</li>`).join('')}
-        </ul>
-    `;
-    detailContainer.style.display = 'block';
-}
+  function displayPokemonDetails(pokemon) {
+    detailsSection.innerHTML = `<h2>Pokémon Details</h2>
+            <div>Name: ${pokemon.name}</div>
+            <div>Height: ${pokemon.height}</div>
+            <div>Weight: ${pokemon.weight}</div>
+            <img src="${pokemon.sprites.front_default}" alt="${pokemon.name}">`;
 
-function updatePokemonList() {
-    const pokemonElements = document.querySelectorAll('.pokemon');
-    pokemonElements.forEach(pokemonElement => {
-        const button = pokemonElement.querySelector('.catch-btn');
-        const pokemonId = button.getAttribute('data-pokemon-id');
-        button.textContent = isCaught(pokemonId) ? 'Release' : 'Catch';
-    });
-}
+    if (!document.getElementById(`caught-${pokemon.id}`)) {
+      const catchButton = document.createElement("button");
+      catchButton.textContent = "Catch";
+      catchButton.addEventListener("click", () => {
+        catchPokemon(pokemon);
+      });
+      detailsSection.appendChild(catchButton);
+    }
+  }
 
-let offset = 0;
-const limit = 20;
-document.getElementById('load-more').addEventListener('click', () => {
-    offset += limit;
-    fetchPokemon(offset, limit);
+  function catchPokemon(pokemon) {
+    const caughtPokemonItem = document.createElement("div");
+    caughtPokemonItem.id = `caught-${pokemon.id}`;
+    caughtPokemonItem.classList.add("pokemon-item");
+    const pokemonImage = document.createElement("img");
+    pokemonImage.src = pokemon.sprites.front_default;
+    const pokemonName = document.createElement("span");
+    pokemonName.textContent = pokemon.name;
+    caughtPokemonItem.appendChild(pokemonImage);
+    caughtPokemonItem.appendChild(pokemonName);
+    caughtPokemonList.appendChild(caughtPokemonItem);
+
+    // Remove the 'Catch' button since the Pokémon is caught
+    const catchButton = detailsSection.querySelector("button");
+    if (catchButton) {
+      catchButton.remove();
+    }
+  }
+
+  fetchPokemon();
 });
-
-fetchPokemon();
-
